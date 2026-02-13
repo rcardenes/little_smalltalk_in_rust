@@ -25,6 +25,12 @@ impl ValidObject for Integer {
     }
 }
 
+impl PartialEq for Integer {
+    fn eq(&self, other: &Self) -> bool {
+        Integer::is_valid(other) && self.value == other.value
+    }
+}
+
 #[derive(Debug)]
 pub struct Float {
     header: ObjectHeader,

@@ -54,6 +54,25 @@ impl<T: ValidObject> MemBlock<T> {
         }
     }
 
+    fn drop(&mut self, ptr: ObjectPointer, next_free: ObjectPointer) -> ObjectPointer {
+        if self.allocations < 1 {
+            panic!("Attempting to deallocate from an empty block");
+        }
+
+        self.allocations -= 1;
+        let o_pointer = unsafe {
+            self.elements.as_ptr().add(ptr.offset() as usize * self.element_size)
+        };
+
+        unsafe {
+            (o_pointer as *mut T).drop_in_place();
+            (o_pointer as *mut ObjectHeader).write(ObjectHeader::null());
+            (o_pointer as *mut ObjectPointer).write(next_free);
+        }
+
+        ptr
+    }
+
     fn get(&self, offset: usize) -> Option<&T> {
         if offset >= self.max_elements {
             return None;
@@ -134,8 +153,23 @@ impl<T> MemAlloc for MemPool<T>
         Some(target)
     }
 
-    fn deallocate(&mut self, _ptr: ObjectPointer) -> Result<(), String> {
-        todo!()
+    fn deallocate(&mut self, ptr: ObjectPointer) -> Result<(), String> {
+        let block_index = ptr.block_index();
+        if block_index >= self.blocks.len() {
+            return Err(format!("Invalid block index: {}", block_index));
+        }
+
+        let block = &mut self.blocks[block_index];
+        let offset = ptr.offset();
+        let obj_ref = block.get(offset)
+            .ok_or("Invalid offset".to_string())?;
+        if T::is_valid(obj_ref) {
+            self.free_list = block.drop(ptr, self.free_list);
+
+            Ok(())
+        } else {
+            Err(String::from("Not a pointer to a valid object"))
+        }
     }
 
     fn to_type(&self, _ptr: ObjectPointer) -> Option<&Self::Item> {
@@ -215,6 +249,23 @@ mod tests {
         let i42 = integer_to_bytes(Integer::new(42));
 
         assert_eq!(initialized_integer, &i42);
+    }
+
+    #[test]
+    fn test_mem_block_deallocate_integer() {
+        let (mut block, mut free_list_head) = initialize_block::<Integer>(10);
+
+        free_list_head = block.emplace(free_list_head.offset(), Integer::new(42));
+        let to_delete = free_list_head;
+        free_list_head = block.emplace(free_list_head.offset(), Integer::new(256));
+        free_list_head = block.emplace(free_list_head.offset(), Integer::new(16776960));
+
+        let int_val = &block[to_delete.offset()];
+        assert_eq!(int_val, &Integer::new(256));
+
+        let next_free = block.drop(to_delete, free_list_head);
+        assert_eq!(next_free, to_delete);
+        assert!(!Integer::is_valid(&block[to_delete.offset()]));
     }
 
     #[test]
