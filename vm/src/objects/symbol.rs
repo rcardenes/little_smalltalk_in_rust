@@ -3,6 +3,7 @@ use super::object::{
     SYMBOLSIZE,
 };
 
+#[derive(Debug)]
 pub struct Symbol {
     header: ObjectHeader,
     value: String,
@@ -14,5 +15,11 @@ impl Symbol {
             header: ObjectHeader::new(SYMBOLSIZE),
             value,
         }
+    }
+}
+
+impl PartialEq for Symbol {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
     }
 }

@@ -118,7 +118,10 @@ impl<T> MemAlloc for MemPool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objects::number::Integer;
+    use crate::objects::{
+        number::Integer,
+        symbol::Symbol,
+    };
 
     static INITIALIZED_INTEGER_POOL: &[u8] = &[
         255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -154,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_block_initialization() {
+    fn test_mem_block_initialization() {
         let mut block: MemBlock<Integer> = MemBlock::new(10);
         let ptr = block.init(0, ObjectPointer::null());
 
@@ -163,16 +166,16 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_block_emplace_integer() {
+    fn test_mem_block_emplace_integer() {
         let mut block: MemBlock<Integer> = MemBlock::new(10);
         let free_list_head = block.init(0, ObjectPointer::null());
         let integer_size = Layout::new::<Integer>().size();
-        let offset = (free_list_head.offset() as usize) * integer_size;
+        let raw_offset = (free_list_head.offset() as usize) * integer_size;
         let next_free = block.emplace(free_list_head.offset(), Integer::new(42));
 
         assert_eq!(next_free, ObjectPointer::new_from_index_and_offset(0, 8));
         let initialized_integer = unsafe { 
-            let raw_ptr = block.elements.as_ptr().add(offset);
+            let raw_ptr = block.elements.as_ptr().add(raw_offset);
             std::slice::from_raw_parts(raw_ptr, integer_size)
         };
 
@@ -182,7 +185,27 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_pool_initialization() {
+    fn test_mem_block_emplace_symbol() {
+        let mut block: MemBlock<Symbol> = MemBlock::new(10);
+        let free_list_head = block.init(0, ObjectPointer::null());
+        let symbol_size = Layout::new::<Symbol>().size();
+        let raw_offset = (free_list_head.offset() as usize) * symbol_size;
+
+        block.emplace(free_list_head.offset(), Symbol::new("test_symbol".to_string()));
+
+        let symbol= unsafe {
+            (block.elements.as_ptr().add(raw_offset) as *const Symbol).as_ref_unchecked()
+        };
+
+        let s = Symbol::new("test_symbol".to_string());
+
+        assert_eq!(*symbol, s);
+
+        // let symbol = symbol_ptr.read();
+    }
+
+    #[test]
+    fn test_mem_pool_initialization() {
         let mut pool: MemPool<Integer> = MemPool::new(10);
         pool.add_block();
         assert_eq!(pool.free_list, ObjectPointer::new_from_index_and_offset(0, 9));
@@ -193,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_pool_integer_allocation() {
+    fn test_mem_pool_integer_allocation() {
         let mut pool: MemPool<Integer> = MemPool::new(10);
         pool.allocate(Integer::new(42));
 
@@ -208,7 +231,7 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_pool_multiple_integer_allocation() {
+    fn test_mem_pool_multiple_integer_allocation() {
         let mut pool: MemPool<Integer> = MemPool::new(10);
         for i in 0i32..10 {
             pool.allocate(Integer::new(i));

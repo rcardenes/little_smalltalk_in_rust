@@ -64,6 +64,7 @@ impl Pointer for ObjectPointer {
     }
 }
 
+#[derive(Debug)]
 pub struct ObjectHeader {
     ref_count:  RefCount,
     size:       ObjectSize,
