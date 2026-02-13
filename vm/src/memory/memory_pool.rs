@@ -184,10 +184,15 @@ mod tests {
         }
     }
 
+    fn initialize_block<T: ValidObject>(max_elements: usize) -> (MemBlock<T>, ObjectPointer) {
+        let mut block = MemBlock::new(max_elements);
+        let free_block = block.init(0, ObjectPointer::null());
+        (block, free_block)
+    }
+
     #[test]
     fn test_mem_block_initialization() {
-        let mut block: MemBlock<Integer> = MemBlock::new(10);
-        let ptr = block.init(0, ObjectPointer::null());
+        let (block, ptr) = initialize_block::<Integer>(10);
 
         assert_eq!(ptr, ObjectPointer::new_from_index_and_offset(0, 9));
         assert_eq!(block.elements, INITIALIZED_INTEGER_POOL);
@@ -195,8 +200,8 @@ mod tests {
 
     #[test]
     fn test_mem_block_emplace_integer() {
-        let mut block: MemBlock<Integer> = MemBlock::new(10);
-        let free_list_head = block.init(0, ObjectPointer::null());
+        let (mut block, free_list_head) = initialize_block::<Integer>(10);
+
         let integer_size = Layout::new::<Integer>().size();
         let raw_offset = (free_list_head.offset() as usize) * integer_size;
         let next_free = block.emplace(free_list_head.offset(), Integer::new(42));
@@ -214,8 +219,7 @@ mod tests {
 
     #[test]
     fn test_mem_block_emplace_symbol() {
-        let mut block: MemBlock<Symbol> = MemBlock::new(10);
-        let free_list_head = block.init(0, ObjectPointer::null());
+        let (mut block, free_list_head) = initialize_block::<Symbol>(10);
 
         block.emplace(free_list_head.offset(), Symbol::new("test_symbol".to_string()));
 
