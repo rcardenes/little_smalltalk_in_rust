@@ -1,5 +1,6 @@
 #![feature(array_ptr_get)]
 use std::alloc::Layout;
+use std::ops::Index;
 use crate::objects::object::{ ObjectPointer, Pointer };
 
 struct MemBlock<T> {
@@ -50,6 +51,21 @@ impl<T> MemBlock<T> {
             element_ptr.write(value);
 
             return next_free;
+        }
+    }
+}
+
+impl<T> Index<usize> for MemBlock<T> {
+    type Output = T;
+
+    fn index(&self, offset: usize) -> &Self::Output {
+        if offset >= self.max_elements {
+            panic!("Offset out of bounds: {}", offset);
+        }
+
+        unsafe {
+            let element_ptr = self.elements.as_ptr().add(offset * self.element_size) as *const T;
+            &*element_ptr
         }
     }
 }
@@ -188,20 +204,10 @@ mod tests {
     fn test_mem_block_emplace_symbol() {
         let mut block: MemBlock<Symbol> = MemBlock::new(10);
         let free_list_head = block.init(0, ObjectPointer::null());
-        let symbol_size = Layout::new::<Symbol>().size();
-        let raw_offset = (free_list_head.offset() as usize) * symbol_size;
 
         block.emplace(free_list_head.offset(), Symbol::new("test_symbol".to_string()));
 
-        let symbol= unsafe {
-            (block.elements.as_ptr().add(raw_offset) as *const Symbol).as_ref_unchecked()
-        };
-
-        let s = Symbol::new("test_symbol".to_string());
-
-        assert_eq!(*symbol, s);
-
-        // let symbol = symbol_ptr.read();
+        assert_eq!(block[free_list_head.offset()], Symbol::new("test_symbol".to_string()));
     }
 
     #[test]
