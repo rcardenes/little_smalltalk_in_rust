@@ -1,7 +1,7 @@
 #![feature(array_ptr_get)]
 use std::alloc::Layout;
 use std::ops::Index;
-use crate::objects::object::{ ObjectPointer, Pointer };
+use crate::objects::object::{ ObjectHeader, ObjectPointer, Pointer, ValidObject };
 
 struct MemBlock<T> {
     max_elements: usize,
@@ -11,7 +11,7 @@ struct MemBlock<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T> MemBlock<T> {
+impl<T: ValidObject> MemBlock<T> {
     fn new(max_elements: usize) -> Self {
         let element_size = Layout::new::<T>().size();
         let total_size = max_elements * element_size;
@@ -53,6 +53,14 @@ impl<T> MemBlock<T> {
             return next_free;
         }
     }
+
+    fn get(&self, offset: usize) -> Option<&T> {
+        if offset >= self.max_elements {
+            return None;
+        }
+
+        Some(&self[offset])
+    }
 }
 
 impl<T> Index<usize> for MemBlock<T> {
@@ -84,7 +92,9 @@ struct MemPool<T> {
     blocks: Vec<MemBlock<T>>,
 }
 
-impl<T> MemPool<T> {
+impl<T> MemPool<T>
+    where T: ValidObject
+{
     pub fn new(max_elements_per_block: usize) -> Self {
         MemPool::<T> {
             max_elements_per_block,
@@ -107,7 +117,9 @@ impl<T> MemPool<T> {
     }
 }
 
-impl<T> MemAlloc for MemPool<T> {
+impl<T> MemAlloc for MemPool<T>
+    where T: ValidObject
+{
     type Item = T;
 
     fn allocate(&mut self, value: T) -> Option<ObjectPointer> {

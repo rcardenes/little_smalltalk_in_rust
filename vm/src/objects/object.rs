@@ -4,6 +4,8 @@ pub type RefCount = u32;
 pub type ObjectSize = i32;
 pub type ObjectPointer = u32;
 
+pub const INVALIDSIZE: ObjectSize =   -1;
+
 pub const BLOCKSIZE: ObjectSize =     -83;
 pub const BYTEARRAYSIZE: ObjectSize = -567;
 pub const CHARSIZE: ObjectSize =      -33;
@@ -64,6 +66,10 @@ impl Pointer for ObjectPointer {
     }
 }
 
+pub trait ValidObject {
+    fn is_valid(obj: &Self) -> bool;
+}
+
 #[derive(Debug)]
 pub struct ObjectHeader {
     ref_count:  RefCount,
@@ -75,6 +81,17 @@ impl ObjectHeader {
         Self {
             ref_count: 0,
             size,
+        }
+    }
+
+    pub fn is_size(&self, size: ObjectSize) -> bool {
+        self.size == size
+    }
+
+    pub fn null() -> Self {
+        Self {
+            ref_count: 0,
+            size: INVALIDSIZE,
         }
     }
 }

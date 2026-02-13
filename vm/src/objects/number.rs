@@ -1,8 +1,10 @@
 use super::object::{
     FLOATSIZE, INTEGERSIZE,
+    ValidObject,
     ObjectHeader,
 };
 
+#[derive(Debug)]
 pub struct Integer {
     header: ObjectHeader,
     value: i32,
@@ -17,6 +19,13 @@ impl Integer {
     }
 }
 
+impl ValidObject for Integer {
+    fn is_valid(obj: &Self) -> bool {
+        obj.header.is_size(INTEGERSIZE)
+    }
+}
+
+#[derive(Debug)]
 pub struct Float {
     header: ObjectHeader,
     value: f64,
@@ -28,5 +37,11 @@ impl Float {
             header: ObjectHeader::new(FLOATSIZE),
             value,
         }
+    }
+}
+
+impl ValidObject for Float {
+    fn is_valid(obj: &Self) -> bool {
+        obj.header.is_size(FLOATSIZE)
     }
 }
