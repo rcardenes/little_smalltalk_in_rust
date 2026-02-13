@@ -1,6 +1,6 @@
 use super::object::{
     SYMBOLSIZE,
-    ObjectHeader, ValidObject,
+    ObjectHeader, ValidObject, ObjectSize,
 };
 
 #[derive(Debug)]
@@ -10,9 +10,11 @@ pub struct Symbol {
 }
 
 impl Symbol {
+    const SIZE: ObjectSize = SYMBOLSIZE;
+
     pub fn new(value: String) -> Self {
         Symbol {
-            header: ObjectHeader::new(SYMBOLSIZE),
+            header: ObjectHeader::new(Self::SIZE),
             value,
         }
     }
@@ -26,6 +28,6 @@ impl PartialEq for Symbol {
 
 impl ValidObject for Symbol {
     fn is_valid(obj: &Self) -> bool {
-        obj.header.is_size(SYMBOLSIZE)
+        obj.header.is_size(Self::SIZE)
     }
 }

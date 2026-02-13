@@ -1,5 +1,6 @@
 use super::object::{
-    ObjectHeader, ObjectPointer, PROCSIZE
+    PROCSIZE,
+    ObjectHeader, ObjectPointer, ObjectSize,
 };
 
 pub enum ProcessState {
@@ -20,9 +21,11 @@ pub struct Process {
 }
 
 impl Process {
+    const SIZE: ObjectSize = PROCSIZE;
+
     pub fn new(interpreter: ObjectPointer) -> Self {
         Process {
-            header: ObjectHeader::new(PROCSIZE),
+            header: ObjectHeader::new(Self::SIZE),
             interpreter,
             state: ProcessState::Ready,
             next: None,

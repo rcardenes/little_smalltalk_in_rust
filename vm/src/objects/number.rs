@@ -1,27 +1,24 @@
 use super::object::{
     FLOATSIZE, INTEGERSIZE,
     ValidObject,
-    ObjectHeader,
+    ObjectHeader, ObjectSize,
 };
+use proc_macros::ValidSmalltalkObject;
 
-#[derive(Debug)]
+#[derive(Debug, ValidSmalltalkObject)]
 pub struct Integer {
     header: ObjectHeader,
     value: i32,
 }
 
 impl Integer {
+    const SIZE: ObjectSize = INTEGERSIZE;
+
     pub fn new(value: i32) -> Self {
         Integer {
-            header: ObjectHeader::new(INTEGERSIZE),
+            header: ObjectHeader::new(Self::SIZE),
             value,
         }
-    }
-}
-
-impl ValidObject for Integer {
-    fn is_valid(obj: &Self) -> bool {
-        obj.header.is_size(INTEGERSIZE)
     }
 }
 
@@ -31,23 +28,19 @@ impl PartialEq for Integer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, ValidSmalltalkObject)]
 pub struct Float {
     header: ObjectHeader,
     value: f64,
 }
 
 impl Float {
+    const SIZE: ObjectSize = FLOATSIZE;
+
     pub fn new(value: f64) -> Self {
         Float {
-            header: ObjectHeader::new(FLOATSIZE),
+            header: ObjectHeader::new(Self::SIZE),
             value,
         }
-    }
-}
-
-impl ValidObject for Float {
-    fn is_valid(obj: &Self) -> bool {
-        obj.header.is_size(FLOATSIZE)
     }
 }

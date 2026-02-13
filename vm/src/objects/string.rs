@@ -1,6 +1,6 @@
 use super::object::{
     STRINGSIZE,
-    ObjectHeader, ObjectPointer,
+    ObjectHeader, ObjectPointer, ObjectSize,
 };
 
 pub struct StringObject {
@@ -10,9 +10,11 @@ pub struct StringObject {
 }
 
 impl StringObject {
+    const SIZE: ObjectSize = STRINGSIZE;
+
     pub fn new(value: String, super_obj: ObjectPointer) -> Self {
         StringObject {
-            header: ObjectHeader::new(STRINGSIZE),
+            header: ObjectHeader::new(Self::SIZE),
             super_obj,
             value,
         }

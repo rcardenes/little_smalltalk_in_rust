@@ -134,6 +134,15 @@ impl<T> MemPool<T>
         self.free_list = block.init(new_index, self.free_list);
         self.blocks.push(block);
     }
+
+    fn get(&self, ptr: ObjectPointer) -> Option<&T> {
+        let block_index = ptr.block_index();
+        if block_index >= self.blocks.len() {
+            return None;
+        } else {
+            self.blocks[block_index].get(ptr.offset())
+        }
+    }
 }
 
 impl<T> MemAlloc for MemPool<T>
@@ -236,19 +245,10 @@ mod tests {
     fn test_mem_block_emplace_integer() {
         let (mut block, free_list_head) = initialize_block::<Integer>(10);
 
-        let integer_size = Layout::new::<Integer>().size();
-        let raw_offset = (free_list_head.offset() as usize) * integer_size;
         let next_free = block.emplace(free_list_head.offset(), Integer::new(42));
 
         assert_eq!(next_free, ObjectPointer::new_from_index_and_offset(0, 8));
-        let initialized_integer = unsafe { 
-            let raw_ptr = block.elements.as_ptr().add(raw_offset);
-            std::slice::from_raw_parts(raw_ptr, integer_size)
-        };
-
-        let i42 = integer_to_bytes(Integer::new(42));
-
-        assert_eq!(initialized_integer, &i42);
+        assert_eq!(&block[free_list_head.offset()], &Integer::new(42));
     }
 
     #[test]
@@ -289,18 +289,15 @@ mod tests {
     }
 
     #[test]
-    fn test_mem_pool_integer_allocation() {
+    fn test_mem_pool_integer_allocation() -> Result<(), String> {
         let mut pool: MemPool<Integer> = MemPool::new(10);
-        pool.allocate(Integer::new(42));
-
-        let mut mutated_block = INITIALIZED_INTEGER_POOL.to_vec();
-        let integer_size = Layout::new::<Integer>().size();
-        mutated_block[integer_size * 9..integer_size * 10]
-            .copy_from_slice(&integer_to_bytes(Integer::new(42)));
+        let obj_addr: ObjectPointer = pool.allocate(Integer::new(42)).ok_or("Allocation failed")?;
 
         assert_eq!(pool.free_list, ObjectPointer::new_from_index_and_offset(0, 8));
-        assert_eq!(pool.blocks[0].elements, mutated_block);
+        let obj_ref = pool.get(obj_addr).ok_or("Failed to retrieve allocated object")?;
+        assert_eq!(obj_ref, &Integer::new(42));
 
+        Ok(())
     }
 
     #[test]

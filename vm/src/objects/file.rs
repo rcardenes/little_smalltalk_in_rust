@@ -1,6 +1,6 @@
 use super::object::{
     FILESIZE,
-    ObjectHeader,
+    ObjectHeader, ObjectSize,
 };
 
 enum FileMode {
@@ -15,3 +15,8 @@ pub struct File {
     // Placeholder. Later we may implement it based on std::fs::File
     descriptor: usize,
 }
+
+impl File {
+    const SIZE: ObjectSize = FILESIZE;
+}
+

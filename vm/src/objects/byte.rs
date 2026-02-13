@@ -1,6 +1,6 @@
 use super::object::{
     BYTEARRAYSIZE,
-    ObjectHeader
+    ObjectHeader, ObjectSize,
 };
 
 pub struct ByteArray {
@@ -9,9 +9,11 @@ pub struct ByteArray {
 }
 
 impl ByteArray {
+    const SIZE: ObjectSize = BYTEARRAYSIZE;
+
     pub fn new(value: Vec<u8>) -> Self {
         ByteArray {
-            header: ObjectHeader::new(BYTEARRAYSIZE),
+            header: ObjectHeader::new(Self::SIZE),
             value,
         }
     }

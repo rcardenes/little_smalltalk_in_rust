@@ -1,6 +1,6 @@
 use super::object::{
     INTERPSIZE,
-    ObjectHeader, ObjectPointer,
+    ObjectHeader, ObjectPointer, ObjectSize,
 };
 
 pub struct Interpreter {
@@ -14,6 +14,10 @@ pub struct Interpreter {
     stack: ObjectPointer,
     // stacktop: ... In C this is object**. Figure out how it is used
     current_byte: u32,
+}
+
+impl Interpreter {
+    const SIZE: ObjectSize = INTERPSIZE;
 }
 
 // impl Interpreter {
