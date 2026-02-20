@@ -68,6 +68,7 @@ impl Pointer for ObjectPointer {
 
 pub trait ValidObject {
     fn is_valid(obj: &Self) -> bool;
+    fn set_invalid(obj: &mut Self);
 }
 
 #[derive(Debug)]
@@ -86,6 +87,11 @@ impl ObjectHeader {
 
     pub fn is_size(&self, size: ObjectSize) -> bool {
         self.size == size
+    }
+
+    pub fn set_invalid(&mut self) {
+        self.ref_count = 0;
+        self.size = INVALIDSIZE;
     }
 
     pub fn null() -> Self {

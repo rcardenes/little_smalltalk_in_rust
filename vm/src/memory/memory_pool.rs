@@ -1,9 +1,8 @@
-#![feature(array_ptr_get)]
-use std::alloc::Layout;
-use std::ops::Index;
+use std::{alloc::Layout, fmt::Debug};
+use std::ops::{Index, IndexMut};
 use crate::objects::object::{ ObjectHeader, ObjectPointer, Pointer, ValidObject };
 
-struct MemBlock<T> {
+struct MemBlock<T: ValidObject + Debug> {
     max_elements: usize,
     element_size: usize,
     allocations: usize,
@@ -11,7 +10,9 @@ struct MemBlock<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: ValidObject> MemBlock<T> {
+impl<T> MemBlock<T>
+    where T: ValidObject + Debug
+{
     fn new(max_elements: usize) -> Self {
         let element_size = Layout::new::<T>().size();
         let total_size = max_elements * element_size;
@@ -24,13 +25,15 @@ impl<T: ValidObject> MemBlock<T> {
         }
     }
 
+    fn offset_to_pointer(&self, offset: usize) -> *const u8  {
+        unsafe { self.elements.as_ptr().add(offset * self.element_size) }
+    }
+
     fn init(&mut self, index: usize, free_list_head: ObjectPointer) -> ObjectPointer {
         let mut current_head: ObjectPointer = free_list_head;
 
         for i in 0..self.max_elements {
-            let o_pointer = unsafe {
-                self.elements.as_ptr().add(i * self.element_size) as *mut ObjectPointer
-            };
+            let o_pointer = self.offset_to_pointer(i) as *mut ObjectPointer;
 
             unsafe {
                 *o_pointer = current_head;
@@ -44,10 +47,10 @@ impl<T: ValidObject> MemBlock<T> {
     fn emplace(&mut self, offset: usize, value: T) -> ObjectPointer {
         self.allocations += 1;
         unsafe {
-            let next_free = (self.elements.as_ptr().add(offset * self.element_size) as *const ObjectPointer)
-                .read();
+            let ptr = self.offset_to_pointer(offset);
+            let next_free = (ptr as *const ObjectPointer).read();
+            let element_ptr = ptr as *mut T;
 
-            let element_ptr = self.elements.as_ptr().add(offset * self.element_size) as *mut T;
             element_ptr.write(value);
 
             return next_free;
@@ -60,13 +63,13 @@ impl<T: ValidObject> MemBlock<T> {
         }
 
         self.allocations -= 1;
-        let o_pointer = unsafe {
-            self.elements.as_ptr().add(ptr.offset() as usize * self.element_size)
-        };
+        let o_pointer = self.offset_to_pointer(ptr.offset());
 
         unsafe {
             (o_pointer as *mut T).drop_in_place();
-            (o_pointer as *mut ObjectHeader).write(ObjectHeader::null());
+        }
+        T::set_invalid(self.get_mut(ptr.offset()));
+        unsafe {
             (o_pointer as *mut ObjectPointer).write(next_free);
         }
 
@@ -80,9 +83,19 @@ impl<T: ValidObject> MemBlock<T> {
 
         Some(&self[offset])
     }
+
+    fn get_mut(&mut self, offset: usize) -> &mut T {
+        if offset >= self.max_elements {
+            panic!("Offset out of bounds: {}", offset);
+        }
+
+        &mut self[offset]
+    }
 }
 
-impl<T> Index<usize> for MemBlock<T> {
+impl<T> Index<usize> for MemBlock<T>
+    where T: ValidObject + Debug
+{
     type Output = T;
 
     fn index(&self, offset: usize) -> &Self::Output {
@@ -90,10 +103,21 @@ impl<T> Index<usize> for MemBlock<T> {
             panic!("Offset out of bounds: {}", offset);
         }
 
-        unsafe {
-            let element_ptr = self.elements.as_ptr().add(offset * self.element_size) as *const T;
-            &*element_ptr
+        let element_ptr = self.offset_to_pointer(offset) as *const T;
+        unsafe { &*element_ptr }
+    }
+}
+
+impl<T> IndexMut<usize> for MemBlock<T>
+    where T: ValidObject + Debug
+{
+    fn index_mut(&mut self, offset: usize) -> &mut Self::Output {
+        if offset >= self.max_elements {
+            panic!("Offset out of bounds: {}", offset);
         }
+
+        let element_ptr = self.offset_to_pointer(offset) as *mut T;
+        unsafe { &mut *element_ptr }
     }
 }
 
@@ -105,14 +129,14 @@ pub trait MemAlloc {
     fn to_type(&self, ptr: ObjectPointer) -> Option<&Self::Item>;
 }
 
-struct MemPool<T> {
+struct MemPool<T: ValidObject + Debug> {
     max_elements_per_block: usize,
     free_list: ObjectPointer,
     blocks: Vec<MemBlock<T>>,
 }
 
 impl<T> MemPool<T>
-    where T: ValidObject
+    where T: ValidObject + Debug
 {
     pub fn new(max_elements_per_block: usize) -> Self {
         MemPool::<T> {
@@ -146,7 +170,7 @@ impl<T> MemPool<T>
 }
 
 impl<T> MemAlloc for MemPool<T>
-    where T: ValidObject
+    where T: ValidObject + Debug
 {
     type Item = T;
 
@@ -192,6 +216,7 @@ mod tests {
     use crate::objects::{
         number::Integer,
         symbol::Symbol,
+        byte::ByteArray,
     };
 
     static INITIALIZED_INTEGER_POOL: &[u8] = &[
@@ -227,7 +252,9 @@ mod tests {
         }
     }
 
-    fn initialize_block<T: ValidObject>(max_elements: usize) -> (MemBlock<T>, ObjectPointer) {
+    fn initialize_block<T>(max_elements: usize) -> (MemBlock<T>, ObjectPointer)
+        where T: ValidObject + Debug
+    {
         let mut block = MemBlock::new(max_elements);
         let free_block = block.init(0, ObjectPointer::null());
         (block, free_block)
@@ -275,6 +302,30 @@ mod tests {
         block.emplace(free_list_head.offset(), Symbol::new("test_symbol".to_string()));
 
         assert_eq!(block[free_list_head.offset()], Symbol::new("test_symbol".to_string()));
+    }
+
+    #[test]
+    fn test_mem_block_emplace_byte() {
+        let (mut block, free_list_head) = initialize_block::<ByteArray>(10);
+
+        block.emplace(free_list_head.offset(), ByteArray::new(vec![1, 2, 3, 4, 5]));
+
+        assert_eq!(block[free_list_head.offset()], ByteArray::new(vec![1, 2, 3, 4, 5]));
+    }
+
+    #[test]
+    fn test_mem_block_deallocate_byte() {
+        let (mut block, mut free_list_head) = initialize_block::<ByteArray>(10);
+
+        let to_delete = free_list_head;
+
+
+        free_list_head = block.emplace(free_list_head.offset(), ByteArray::new(vec![1, 2, 3, 4, 5]));
+        free_list_head = block.emplace(free_list_head.offset(), ByteArray::new(vec![6, 7, 8, 9, 10, 11, 12, 13, 14, 15]));
+        let next_free = block.drop(to_delete, free_list_head);
+
+        assert_eq!(next_free, to_delete);
+        assert!(!ByteArray::is_valid(&block[to_delete.offset()]));
     }
 
     #[test]
